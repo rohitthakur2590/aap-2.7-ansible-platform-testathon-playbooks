@@ -1,0 +1,69 @@
+---
+# TC-1640-2-1-3: Organization — Update Description
+#
+# Run: ansible-playbook playbooks/org/TC-1640-2-1-3-update.yml
+#
+- name: "TC-1640-2-1-3 | Organization — Update Description"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[setup] Create org with initial description"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Initial description"
+            state: present
+            <<: *aap_conn
+
+        - name: "[TC-1640-2-1-3] Update description"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Updated description for testathon"
+            state: present
+            <<: *aap_conn
+          register: result
+
+        - name: Assert changed on update
+          ansible.builtin.assert:
+            that:
+              - result is changed
+            fail_msg: "Description update did not report changed"
+
+        - name: "[TC-1640-2-1-3] Idempotency after update"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Updated description for testathon"
+            state: present
+            <<: *aap_conn
+          register: idem
+
+        - name: Assert idempotent after update
+          ansible.builtin.assert:
+            that:
+              - idem is not changed
+            fail_msg: "Re-run after update was not idempotent"
+
+        - name: "[TC-1640-2-1-3] PASS"
+          ansible.builtin.debug:
+            msg: "TC-1640-2-1-3 PASSED — organization description updated and idempotent"
+
+      rescue:
+        - name: "[TC-1640-2-1-3] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-2-1-3 FAILED"
+
+      always:
+        - ansible.builtin.include_tasks: ../../reset/org.yml
+...

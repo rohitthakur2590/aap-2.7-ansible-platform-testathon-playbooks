@@ -1,0 +1,8 @@
+---
+# AAP Gateway connection settings
+# Update these to match your test pod / local AAP instance
+aap_hostname: "https://<YOUR_POD_HOSTNAME>/"
+aap_username: "admin"
+aap_password: "REPLACE_ME"
+aap_validate_certs: false
+aap_request_timeout: 60

@@ -1,0 +1,11 @@
+---
+- name: "[reset] Delete test user"
+  ansible.platform.user:
+    username: "{{ user_name }}"
+    state: absent
+    aap_hostname: "{{ aap_hostname }}"
+    aap_username: "{{ aap_username }}"
+    aap_password: "{{ aap_password }}"
+    aap_validate_certs: "{{ aap_validate_certs }}"
+  register: _r
+  failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))

@@ -1,0 +1,59 @@
+---
+# TC-1640-2-21-1: Read, update, and restore a gateway setting
+# Uses SESSION_COOKIE_AGE (default: 1800 seconds) as a safe test setting.
+- name: "TC-1640-2-21-1 | Settings — Update and Restore"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    test_setting: "SESSION_COOKIE_AGE"
+    original_value: 1800
+    new_value: 3600
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[TC-1640-2-21-1] Update SESSION_COOKIE_AGE to 3600"
+          ansible.platform.settings:
+            settings:
+              SESSION_COOKIE_AGE: "{{ new_value }}"
+            <<: *aap_conn
+          register: upd
+
+        - name: Assert changed and old/new values reported
+          ansible.builtin.assert:
+            that:
+              - upd is changed
+              - upd.settings.old_values[test_setting] | string == original_value | string
+              - upd.settings.new_values[test_setting] | string == new_value | string
+            fail_msg: "Settings update failed or old/new values missing in result"
+
+        - name: "[TC-1640-2-21-1] Idempotency — same value again"
+          ansible.platform.settings:
+            settings:
+              SESSION_COOKIE_AGE: "{{ new_value }}"
+            <<: *aap_conn
+          register: idem
+        - ansible.builtin.assert:
+            that: idem is not changed
+            fail_msg: "Settings re-run with same value not idempotent"
+
+        - ansible.builtin.debug:
+            msg: "TC-1640-2-21-1 PASSED"
+      rescue:
+        - ansible.builtin.fail:
+            msg: "TC-1640-2-21-1 FAILED"
+      always:
+        - name: "[cleanup] Restore SESSION_COOKIE_AGE to original"
+          ansible.platform.settings:
+            settings:
+              SESSION_COOKIE_AGE: "{{ original_value }}"
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed
+...

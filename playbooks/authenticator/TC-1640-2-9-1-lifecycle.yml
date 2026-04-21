@@ -1,0 +1,72 @@
+---
+# TC-1640-2-9-1/2/3: Authenticator create, idempotency, delete
+- name: "TC-1640-2-9-1 | Authenticator — Lifecycle"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    auth_name: "TestAuth-1640-{{ rh_username }}"
+    auth_slug: "testauth-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[TC-1640-2-9-1] Create local authenticator (disabled)"
+          ansible.platform.authenticator:
+            name: "{{ auth_name }}"
+            slug: "{{ auth_slug }}"
+            type: "ansible_base.authentication.authenticator_plugins.local"
+            configuration: {}
+            enabled: false
+            state: present
+            <<: *aap_conn
+          register: result
+
+        - name: Assert changed and keys present
+          ansible.builtin.assert:
+            that:
+              - result is changed
+              - result.authenticator.name == auth_name
+              - result.name == auth_name
+            fail_msg: "Authenticator create failed or keys missing"
+
+        - name: "[TC-1640-2-9-2] Idempotency"
+          ansible.platform.authenticator:
+            name: "{{ auth_name }}"
+            slug: "{{ auth_slug }}"
+            type: "ansible_base.authentication.authenticator_plugins.local"
+            configuration: {}
+            enabled: false
+            state: present
+            <<: *aap_conn
+          register: idem
+        - ansible.builtin.assert:
+            that: idem is not changed
+            fail_msg: "Authenticator re-run not idempotent"
+
+        - name: "[TC-1640-2-9-3] Delete authenticator"
+          ansible.platform.authenticator:
+            name: "{{ auth_name }}"
+            slug: "{{ auth_slug }}"
+            type: "ansible_base.authentication.authenticator_plugins.local"
+            configuration: {}
+            state: absent
+            <<: *aap_conn
+          register: del
+        - ansible.builtin.assert:
+            that: del is changed
+            fail_msg: "Authenticator delete not reported as changed"
+
+        - ansible.builtin.debug:
+            msg: "TC-1640-2-9-1/2/3 PASSED"
+      rescue:
+        - ansible.builtin.fail:
+            msg: "TC-1640-2-9-1 FAILED"
+      always:
+        - ansible.builtin.include_tasks: ../../reset/authenticator.yml
+...

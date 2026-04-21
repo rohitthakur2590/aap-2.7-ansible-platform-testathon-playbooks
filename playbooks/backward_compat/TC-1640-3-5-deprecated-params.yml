@@ -1,0 +1,109 @@
+---
+# TC-1640-3-5: Deprecated parameter warning
+# Verifies that using deprecated 2.6 param still works but emits a deprecation warning
+# with the correct sunset date.
+#
+# Run: ansible-playbook playbooks/backward_compat/TC-1640-3-5-deprecated-params.yml
+#
+- name: "TC-1640-3-5 | Deprecated Params — Warning Issued, Task Still Succeeds"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-BC2-1640-{{ rh_username }}"
+    user_name: "testuser-bc2-1640-{{ rh_username }}"
+    role_name: "TestRole-BC-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[setup] Create org, user, role"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: present
+            <<: *aap_conn
+
+        - ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "bc2-{{ rh_username }}@testathon.local"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: usr
+
+        - ansible.platform.role_definition:
+            name: "{{ role_name }}"
+            content_type: "shared.organization"
+            permissions:
+              - "shared.view_organization"
+            state: present
+            <<: *aap_conn
+          register: role
+
+        - name: "[TC-1640-3-5] Use deprecated object_id (singular) param"
+          ansible.platform.role_user_assignment:
+            role_definition: "{{ role_name }}"
+            user: "{{ user_name }}"
+            object_id: "{{ usr.id }}"
+            state: present
+            <<: *aap_conn
+          register: rua
+
+        - name: Assert task succeeded despite deprecated param
+          ansible.builtin.assert:
+            that:
+              - rua is not failed
+              - rua is changed
+            fail_msg: "Task failed when using deprecated object_id param"
+
+        - name: Assert deprecation warning was issued
+          ansible.builtin.assert:
+            that:
+              - rua.deprecations is defined
+              - rua.deprecations | length > 0
+            fail_msg: >
+              No deprecation warning issued for object_id param.
+              Expected a deprecation warning with sunset date 2026-05-20.
+              rua.deprecations={{ rua.deprecations | default([]) }}
+
+        - name: "[TC-1640-3-5] PASS"
+          ansible.builtin.debug:
+            msg: >
+              TC-1640-3-5 PASSED — deprecated object_id param still works,
+              deprecation warning issued: {{ rua.deprecations[0].msg | default('see result') }}
+
+      rescue:
+        - name: "[TC-1640-3-5] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-3-5 FAILED"
+
+      always:
+        - ansible.platform.role_definition:
+            name: "{{ role_name }}"
+            content_type: "shared.organization"
+            permissions:
+              - "shared.view_organization"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

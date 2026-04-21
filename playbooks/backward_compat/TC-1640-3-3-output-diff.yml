@@ -1,0 +1,175 @@
+---
+# TC-1640-3-3: Output diff — verify all 2.6 keys are present in 2.7 output
+#
+# This test creates an org and a user, then asserts that every key that was
+# present in the stable-2.6 output is still present in the 2.7 output.
+# It also validates the new 2.7 nested structure exists alongside the flat keys.
+#
+# Run: ansible-playbook playbooks/backward_compat/TC-1640-3-3-output-diff.yml
+#
+- name: "TC-1640-3-3 | Backward Compat — 2.6 Keys All Present in 2.7 Output"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-BC3-1640-{{ rh_username }}"
+    user_name: "testuser-bc3-1640-{{ rh_username }}"
+    team_name: "TestTeam-BC3-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        # ---- Organization output diff ----
+        - name: "[TC-1640-3-3] Create organization"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "BC3 diff test org"
+            state: present
+            <<: *aap_conn
+          register: org
+
+        - name: "Assert 2.7 nested organization keys exist"
+          ansible.builtin.assert:
+            that:
+              - org.organization is defined
+              - org.organization.id is defined
+              - org.organization.name is defined
+              - org.organization.description is defined
+            fail_msg: >
+              REGRESSION: 2.7 nested org.organization.* keys missing.
+              org={{ org | to_nice_json }}
+
+        - name: "Assert 2.6 flat organization keys still present"
+          ansible.builtin.assert:
+            that:
+              - org.id is defined
+              - org.name is defined
+              - org.description is defined
+              - org.id == org.organization.id
+              - org.name == org.organization.name
+              - org.description == org.organization.description
+            fail_msg: >
+              REGRESSION: 2.6 flat org.* keys missing or mismatched.
+              org.id={{ org.id | default('UNDEFINED') }},
+              org.name={{ org.name | default('UNDEFINED') }},
+              org.description={{ org.description | default('UNDEFINED') }}
+
+        # ---- User output diff ----
+        - name: "[TC-1640-3-3] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "bc3-{{ rh_username }}@testathon.local"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: usr
+
+        - name: "Assert 2.7 nested user keys exist"
+          ansible.builtin.assert:
+            that:
+              - usr.user is defined
+              - usr.user.id is defined
+              - usr.user.username is defined
+              - usr.user.email is defined
+            fail_msg: >
+              REGRESSION: 2.7 nested usr.user.* keys missing.
+              usr={{ usr | to_nice_json }}
+
+        - name: "Assert 2.6 flat user keys still present"
+          ansible.builtin.assert:
+            that:
+              - usr.id is defined
+              - usr.username is defined
+              - usr.email is defined
+              - usr.id == usr.user.id
+              - usr.username == usr.user.username
+              - usr.email == usr.user.email
+            fail_msg: >
+              REGRESSION: 2.6 flat usr.* keys missing or mismatched.
+              usr.id={{ usr.id | default('UNDEFINED') }},
+              usr.username={{ usr.username | default('UNDEFINED') }},
+              usr.email={{ usr.email | default('UNDEFINED') }}
+
+        # ---- Team output diff ----
+        - name: "[TC-1640-3-3] Create team"
+          ansible.platform.team:
+            name: "{{ team_name }}"
+            organization: "{{ org_name }}"
+            state: present
+            <<: *aap_conn
+          register: team
+
+        - name: "Assert 2.7 nested team keys exist"
+          ansible.builtin.assert:
+            that:
+              - team.team is defined
+              - team.team.id is defined
+              - team.team.name is defined
+            fail_msg: >
+              REGRESSION: 2.7 nested team.team.* keys missing.
+              team={{ team | to_nice_json }}
+
+        - name: "Assert 2.6 flat team keys still present"
+          ansible.builtin.assert:
+            that:
+              - team.id is defined
+              - team.name is defined
+              - team.id == team.team.id
+              - team.name == team.team.name
+            fail_msg: >
+              REGRESSION: 2.6 flat team.* keys missing or mismatched.
+              team.id={{ team.id | default('UNDEFINED') }},
+              team.name={{ team.name | default('UNDEFINED') }}
+
+        - name: "Assert changed/failed meta-keys present (2.6 compatible)"
+          ansible.builtin.assert:
+            that:
+              - org.changed is defined
+              - org.failed is defined
+              - usr.changed is defined
+              - usr.failed is defined
+              - team.changed is defined
+              - team.failed is defined
+            fail_msg: "REGRESSION: changed/failed meta keys missing from module output"
+
+        - name: "[TC-1640-3-3] PASS"
+          ansible.builtin.debug:
+            msg: >
+              TC-1640-3-3 PASSED — All 2.6 flat keys present alongside new 2.7 nested keys.
+              org: id={{ org.id }}, name={{ org.name }}
+              usr: id={{ usr.id }}, username={{ usr.username }}
+              team: id={{ team.id }}, name={{ team.name }}
+
+      rescue:
+        - name: "[TC-1640-3-3] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-3-3 FAILED — see assertion failures above"
+
+      always:
+        - ansible.platform.team:
+            name: "{{ team_name }}"
+            organization: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

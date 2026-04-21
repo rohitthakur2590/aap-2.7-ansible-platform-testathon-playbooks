@@ -1,0 +1,5 @@
+---
+# Your Red Hat username — used to namespace test resources so they don't collide
+# across testers sharing the same AAP pod.
+# Example: rh_username: jsmith
+rh_username: "REPLACE_ME"

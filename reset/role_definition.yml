@@ -1,0 +1,14 @@
+---
+- name: "[reset] Delete test role definition"
+  ansible.platform.role_definition:
+    name: "{{ role_name }}"
+    permissions:
+      - "shared.view_organization"
+    content_type: "shared.organization"
+    state: absent
+    aap_hostname: "{{ aap_hostname }}"
+    aap_username: "{{ aap_username }}"
+    aap_password: "{{ aap_password }}"
+    aap_validate_certs: "{{ aap_validate_certs }}"
+  register: _r
+  failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))

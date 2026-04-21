@@ -1,0 +1,100 @@
+---
+# TC-1640-1-1: Connection mode — local
+# Verifies full user lifecycle (create → idempotency → delete) using connection: local
+# This is the default mode. No extra configuration required.
+#
+# Run: ansible-playbook playbooks/connection/TC-1640-1-1-local.yml
+#
+- name: "TC-1640-1-1 | Connection: local — user lifecycle"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    test_username: "tc1640-conn-{{ rh_username }}"
+    test_email: "tc1640-conn-{{ rh_username }}@testathon.local"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[TC-1640-1-1] Create user (connection: local)"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "{{ test_email }}"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: create_result
+
+        - name: Assert create changed
+          ansible.builtin.assert:
+            that:
+              - create_result is changed
+              - create_result.user.username == test_username
+            fail_msg: "User creation failed or result.user.username missing (TC-1640-1-1)"
+
+        - name: "[TC-1640-1-1] Re-run for idempotency"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "{{ test_email }}"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: idem_result
+
+        - name: Assert idempotent
+          ansible.builtin.assert:
+            that:
+              - idem_result is not changed
+            fail_msg: "User re-run was not idempotent (TC-1640-1-1)"
+
+        - name: "[TC-1640-1-1] Delete user"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            state: absent
+            <<: *aap_conn
+          register: delete_result
+
+        - name: Assert delete changed
+          ansible.builtin.assert:
+            that:
+              - delete_result is changed
+            fail_msg: "User delete did not report changed (TC-1640-1-1)"
+
+        - name: "[TC-1640-1-1] Re-run delete (idempotent absent)"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            state: absent
+            <<: *aap_conn
+          register: delete_idem
+
+        - name: Assert delete idempotent
+          ansible.builtin.assert:
+            that:
+              - delete_idem is not changed
+            fail_msg: "Delete re-run was not idempotent (TC-1640-1-1)"
+
+        - name: "[TC-1640-1-1] PASS"
+          ansible.builtin.debug:
+            msg: "TC-1640-1-1 PASSED — connection: local lifecycle verified"
+
+      rescue:
+        - name: "[TC-1640-1-1] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-1-1 FAILED — see above errors"
+
+      always:
+        - name: "[cleanup] Ensure user removed"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

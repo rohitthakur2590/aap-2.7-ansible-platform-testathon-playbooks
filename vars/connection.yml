@@ -1,0 +1,10 @@
+---
+# Connection mode for ansible.platform modules.
+# Options:
+#   local           — default, runs via Ansible action plugin on localhost (no extra config needed)
+#   http-direct     — each task opens a new HTTP session to the Gateway
+#   http-persistent — one long-lived session reused across all tasks in a play (fastest)
+#
+# Set this before running Section A (connection mode) tests.
+# For Section B (CRUD) tests, leave as "local" unless specifically testing a mode.
+connection_mode: "local"

@@ -1,0 +1,77 @@
+---
+# TC-1640-2-1-1: Create Organization
+# Module: ansible.platform.organization
+# Validates: create, 2.7 nested key (result.organization.name), 2.6 flat key (result.name)
+#
+# Run: ansible-playbook playbooks/org/TC-1640-2-1-1-create.yml
+#
+- name: "TC-1640-2-1-1 | Create Organization"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[TC-1640-2-1-1] Create organization"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Testathon org for {{ rh_username }}"
+            state: present
+            <<: *aap_conn
+          register: result
+
+        - name: Assert changed
+          ansible.builtin.assert:
+            that:
+              - result is changed
+            fail_msg: "Organization was not created (changed=false)"
+
+        - name: "Assert 2.7 nested key — result.organization.name"
+          ansible.builtin.assert:
+            that:
+              - result.organization is defined
+              - result.organization.name == org_name
+            fail_msg: >
+              REGRESSION: result.organization.name missing or wrong.
+              Got: {{ result.organization | default('UNDEFINED') }}
+
+        - name: "Assert 2.6 flat key — result.name (backward compat)"
+          ansible.builtin.assert:
+            that:
+              - result.name is defined
+              - result.name == org_name
+            fail_msg: >
+              REGRESSION: result.name flat key missing (2.6 backward compat broken).
+              result.name={{ result.name | default('UNDEFINED') }}
+
+        - name: "Assert result.organization.id is set"
+          ansible.builtin.assert:
+            that:
+              - result.organization.id is defined
+              - result.organization.id | int > 0
+            fail_msg: "result.organization.id missing or zero"
+
+        - name: "[TC-1640-2-1-1] PASS"
+          ansible.builtin.debug:
+            msg: >
+              TC-1640-2-1-1 PASSED
+              org={{ result.organization.name }}, id={{ result.organization.id }}
+
+      rescue:
+        - name: "[TC-1640-2-1-1] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-2-1-1 FAILED — see above"
+
+      always:
+        - ansible.builtin.include_tasks: ../../reset/org.yml
+...

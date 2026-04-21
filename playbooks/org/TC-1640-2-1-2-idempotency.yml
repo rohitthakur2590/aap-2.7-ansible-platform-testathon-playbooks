@@ -1,0 +1,56 @@
+---
+# TC-1640-2-1-2: Organization — Idempotent Re-run
+# Pre-req: TC-1640-2-1-1 (org must exist going in; this test cleans up after itself)
+#
+# Run: ansible-playbook playbooks/org/TC-1640-2-1-2-idempotency.yml
+#
+- name: "TC-1640-2-1-2 | Organization — Idempotent Re-run"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[setup] Ensure org exists"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Testathon org for {{ rh_username }}"
+            state: present
+            <<: *aap_conn
+
+        - name: "[TC-1640-2-1-2] Re-run with identical params"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "Testathon org for {{ rh_username }}"
+            state: present
+            <<: *aap_conn
+          register: result
+
+        - name: Assert not changed
+          ansible.builtin.assert:
+            that:
+              - result is not changed
+            fail_msg: "Organization idempotency failed — task reported changed on re-run"
+
+        - name: "[TC-1640-2-1-2] PASS"
+          ansible.builtin.debug:
+            msg: "TC-1640-2-1-2 PASSED — organization is idempotent"
+
+      rescue:
+        - name: "[TC-1640-2-1-2] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-2-1-2 FAILED"
+
+      always:
+        - ansible.builtin.include_tasks: ../../reset/org.yml
+...

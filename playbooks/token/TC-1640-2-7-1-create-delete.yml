@@ -1,0 +1,93 @@
+---
+# TC-1640-2-7-1: Create token and verify ansible_facts.aap_token
+# TC-1640-2-7-2: Delete by existing_token_id
+# TC-1640-2-7-3: Create with scope list (read + write)
+- name: "TC-1640-2-7-1 | Token — Create, Verify Facts & Delete"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[TC-1640-2-7-1] Create token (scope: write)"
+          ansible.platform.token:
+            description: "Testathon token - {{ rh_username }}"
+            scope: "write"
+            state: present
+            <<: *aap_conn
+          register: tok
+
+        - name: Assert changed and ansible_facts set
+          ansible.builtin.assert:
+            that:
+              - tok is changed
+              - tok.token is defined
+              - tok.id is defined
+            fail_msg: "Token create failed or tok.token/tok.id missing"
+
+        - name: Assert ansible_facts.aap_token is set
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.aap_token is defined
+              - ansible_facts.aap_token.token | length > 0
+              - ansible_facts.aap_token.id | int > 0
+            fail_msg: "ansible_facts.aap_token not set after token creation"
+
+        - name: "[TC-1640-2-7-3] Create combined-scope token (read + write list)"
+          ansible.platform.token:
+            description: "Testathon combined token - {{ rh_username }}"
+            scope:
+              - "read"
+              - "write"
+            state: present
+            <<: *aap_conn
+          register: tok2
+
+        - name: Assert combined scope token created
+          ansible.builtin.assert:
+            that:
+              - tok2 is changed
+              - tok2.id is defined
+            fail_msg: "Combined scope token creation failed"
+
+        - name: "[TC-1640-2-7-2] Delete first token by existing_token_id"
+          ansible.platform.token:
+            existing_token_id: "{{ tok.id }}"
+            state: absent
+            <<: *aap_conn
+          register: del
+        - ansible.builtin.assert:
+            that: del is changed
+            fail_msg: "Token delete by id not reported as changed"
+
+        - name: "Cleanup combined token"
+          ansible.platform.token:
+            existing_token_id: "{{ tok2.id }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+
+        - ansible.builtin.debug:
+            msg: "TC-1640-2-7-1/2/3 PASSED"
+      rescue:
+        - name: "[TC-1640-2-7-1] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-2-7-1 FAILED"
+      always:
+        - name: "[cleanup] Best-effort token cleanup"
+          ansible.platform.token:
+            existing_token_id: "{{ tok.id | default(omit) }}"
+            state: absent
+            <<: *aap_conn
+          when: tok.id is defined
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

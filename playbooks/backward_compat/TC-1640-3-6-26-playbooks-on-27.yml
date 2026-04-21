@@ -1,0 +1,194 @@
+---
+# TC-1640-3-6: Run 2.6-style playbooks unchanged against the 2.7 collection
+#
+# This test simulates what a user who wrote playbooks targeting stable-2.6 would
+# experience after upgrading to stable-2.7.  It uses only the flat-key result
+# references and the 2.6 param names that were valid at the time.
+#
+# Expected: all tasks succeed; no errors; output keys match 2.6 expectations.
+#
+# Run: ansible-playbook playbooks/backward_compat/TC-1640-3-6-26-playbooks-on-27.yml
+#
+- name: "TC-1640-3-6 | Backward Compat — Unchanged 2.6-style Playbook Runs on 2.7"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-BC6-1640-{{ rh_username }}"
+    user_name: "testuser-bc6-1640-{{ rh_username }}"
+    team_name: "TestTeam-BC6-1640-{{ rh_username }}"
+    role_name: "TestRole-BC6-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        # ---- 2.6-style org task: uses result.name (flat key) ----
+        - name: "[2.6-style] Create organization"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "BC6 compat test org"
+            state: present
+            <<: *aap_conn
+          register: org_result
+
+        - name: "[2.6-style] Assert using flat key org_result.name"
+          ansible.builtin.assert:
+            that:
+              - org_result is changed
+              - org_result.name == org_name
+              - org_result.id is defined
+            fail_msg: >
+              REGRESSION: 2.6-style flat org_result.name access failed on 2.7.
+              org_result.name={{ org_result.name | default('UNDEFINED') }}
+
+        # ---- 2.6-style user task: uses result.username / result.id (flat keys) ----
+        - name: "[2.6-style] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "bc6-{{ rh_username }}@testathon.local"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: user_result
+
+        - name: "[2.6-style] Assert using flat key user_result.username"
+          ansible.builtin.assert:
+            that:
+              - user_result is changed
+              - user_result.username == user_name
+              - user_result.id is defined
+            fail_msg: >
+              REGRESSION: 2.6-style flat user_result.username access failed on 2.7.
+              user_result.username={{ user_result.username | default('UNDEFINED') }}
+
+        # ---- 2.6-style team task: uses result.name (flat key) ----
+        - name: "[2.6-style] Create team"
+          ansible.platform.team:
+            name: "{{ team_name }}"
+            organization: "{{ org_name }}"
+            state: present
+            <<: *aap_conn
+          register: team_result
+
+        - name: "[2.6-style] Assert using flat key team_result.name"
+          ansible.builtin.assert:
+            that:
+              - team_result is changed
+              - team_result.name == team_name
+              - team_result.id is defined
+            fail_msg: >
+              REGRESSION: 2.6-style flat team_result.name access failed on 2.7.
+              team_result.name={{ team_result.name | default('UNDEFINED') }}
+
+        # ---- 2.6-style role_definition task ----
+        - name: "[2.6-style] Create role definition"
+          ansible.platform.role_definition:
+            name: "{{ role_name }}"
+            content_type: "shared.organization"
+            permissions:
+              - "shared.view_organization"
+            state: present
+            <<: *aap_conn
+          register: role_result
+
+        - name: "[2.6-style] Assert role result using flat key"
+          ansible.builtin.assert:
+            that:
+              - role_result is changed
+              - role_result.id is defined
+            fail_msg: >
+              REGRESSION: 2.6-style role_result.id access failed on 2.7.
+              role_result={{ role_result | to_nice_json }}
+
+        # ---- 2.6-style role_user_assignment using user_result.id (flat key) ----
+        - name: "[2.6-style] Assign role to user — referencing user_result.id"
+          ansible.platform.role_user_assignment:
+            role_definition: "{{ role_name }}"
+            user: "{{ user_name }}"
+            object_id: "{{ org_result.id }}"
+            state: present
+            <<: *aap_conn
+          register: rua_result
+
+        - name: "[2.6-style] Assert assignment succeeded"
+          ansible.builtin.assert:
+            that:
+              - rua_result is not failed
+            fail_msg: >
+              REGRESSION: 2.6-style role_user_assignment with flat-key object_id failed on 2.7.
+              rua_result={{ rua_result | to_nice_json }}
+
+        # ---- 2.6-style idempotency check — re-run user create ----
+        - name: "[2.6-style] Re-run user create — verify idempotency"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "bc6-{{ rh_username }}@testathon.local"
+            state: present
+            <<: *aap_conn
+          register: idem_result
+
+        - name: "[2.6-style] Assert idempotent"
+          ansible.builtin.assert:
+            that:
+              - idem_result is not changed
+            fail_msg: "REGRESSION: 2.6-style idempotency broken on 2.7 — task reported changed on re-run"
+
+        - name: "[TC-1640-3-6] PASS"
+          ansible.builtin.debug:
+            msg: >
+              TC-1640-3-6 PASSED — Unchanged 2.6-style playbook ran cleanly on 2.7.
+              Flat key access: org.name={{ org_result.name }},
+              user.username={{ user_result.username }},
+              team.name={{ team_result.name }}
+
+      rescue:
+        - name: "[TC-1640-3-6] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-3-6 FAILED — see assertion failures above"
+
+      always:
+        - ansible.platform.role_user_assignment:
+            role_definition: "{{ role_name }}"
+            user: "{{ user_name }}"
+            object_id: "{{ org_result.id | default('') }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+          when: org_result.id is defined
+        - ansible.platform.role_definition:
+            name: "{{ role_name }}"
+            content_type: "shared.organization"
+            permissions:
+              - "shared.view_organization"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.team:
+            name: "{{ team_name }}"
+            organization: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

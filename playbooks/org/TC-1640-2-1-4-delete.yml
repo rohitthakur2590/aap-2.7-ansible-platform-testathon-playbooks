@@ -1,0 +1,64 @@
+---
+# TC-1640-2-1-4: Organization — Delete (state: absent) + idempotent absent
+#
+# Run: ansible-playbook playbooks/org/TC-1640-2-1-4-delete.yml
+#
+- name: "TC-1640-2-1-4 | Organization — Delete"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[setup] Ensure org exists"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "To be deleted"
+            state: present
+            <<: *aap_conn
+
+        - name: "[TC-1640-2-1-4] Delete organization"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: result
+
+        - name: Assert changed on delete
+          ansible.builtin.assert:
+            that:
+              - result is changed
+            fail_msg: "Delete did not report changed"
+
+        - name: "[TC-1640-2-1-4] Re-run delete (idempotent absent)"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: idem
+
+        - name: Assert not changed on second delete
+          ansible.builtin.assert:
+            that:
+              - idem is not changed
+            fail_msg: "Second delete reported changed — not idempotent"
+
+        - name: "[TC-1640-2-1-4] PASS"
+          ansible.builtin.debug:
+            msg: "TC-1640-2-1-4 PASSED — organization deleted and idempotent absent confirmed"
+
+      rescue:
+        - name: "[TC-1640-2-1-4] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-2-1-4 FAILED"
+...
