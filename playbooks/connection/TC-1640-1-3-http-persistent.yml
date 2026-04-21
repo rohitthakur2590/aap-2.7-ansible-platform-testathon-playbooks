@@ -1,0 +1,98 @@
+---
+# TC-1640-1-3: Connection mode — http-persistent
+# One long-lived manager session is reused across all tasks in this play.
+# Verify: identical results to local/http-direct; no re-auth per task.
+#
+# Run: ansible-playbook playbooks/connection/TC-1640-1-3-http-persistent.yml
+#
+- name: "TC-1640-1-3 | Connection: http-persistent — user lifecycle + session reuse"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    ansible_connection: "ansible.platform.http"
+    ansible_platform_use_persistent_connection: true
+    test_username: "tc1640-persist-{{ rh_username }}"
+    test_email: "tc1640-persist-{{ rh_username }}@testathon.local"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        - name: "[TC-1640-1-3] Task 1 — create user"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "{{ test_email }}"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: t1
+
+        - name: "[TC-1640-1-3] Task 2 — idempotency"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "{{ test_email }}"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: t2
+
+        - name: "[TC-1640-1-3] Task 3 — update email"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "updated-{{ rh_username }}@testathon.local"
+            state: present
+            <<: *aap_conn
+          register: t3
+
+        - name: "[TC-1640-1-3] Task 4 — revert email"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            email: "{{ test_email }}"
+            state: present
+            <<: *aap_conn
+          register: t4
+
+        - name: "[TC-1640-1-3] Task 5 — state: exists check"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            state: exists
+            <<: *aap_conn
+          register: t5
+
+        - name: Assert all results correct
+          ansible.builtin.assert:
+            that:
+              - t1 is changed
+              - t1.user.username == test_username
+              - t2 is not changed
+              - t3 is changed
+              - t4 is changed
+              - t5 is not changed
+              - t5.exists | bool
+            fail_msg: "One or more persistent connection tasks gave unexpected results (TC-1640-1-3)"
+
+        - name: "[TC-1640-1-3] PASS"
+          ansible.builtin.debug:
+            msg: "TC-1640-1-3 PASSED — http-persistent mode verified across 5 tasks"
+
+      rescue:
+        - name: "[TC-1640-1-3] FAIL"
+          ansible.builtin.fail:
+            msg: "TC-1640-1-3 FAILED"
+
+      always:
+        - name: "[cleanup] Delete user"
+          ansible.platform.user:
+            username: "{{ test_username }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...

@@ -1,0 +1,53 @@
+---
+# TC-1640-2-3-6: Delete User
+- name: "TC-1640-2-3-3 | User — Delete"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    user_name: "testuser-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[setup] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "testuser-{{ rh_username }}@testathon.local"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+
+        - name: "[TC-1640-2-3-6] Delete user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: del
+        - ansible.builtin.assert:
+            that: del is changed
+            fail_msg: "Delete not reported as changed"
+
+        - name: "Idempotent absent"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: del2
+        - ansible.builtin.assert:
+            that: del2 is not changed
+            fail_msg: "Delete re-run not idempotent"
+
+        - ansible.builtin.debug:
+            msg: "TC-1640-2-3-6 PASSED"
+      rescue:
+        - ansible.builtin.fail:
+            msg: "TC-1640-2-3-3 FAILED"
+      always:
+        - ansible.builtin.include_tasks: ../../reset/user.yml
+...

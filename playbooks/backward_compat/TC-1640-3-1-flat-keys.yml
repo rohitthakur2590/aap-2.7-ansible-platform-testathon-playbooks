@@ -1,0 +1,135 @@
+---
+# Section C — Backward Compatibility with stable-2.6
+# TC-1640-3-1: Verify flat keys on user module (result.username == result.user.username)
+# TC-1640-3-2: Verify flat keys on organization module (result.name == result.organization.name)
+# TC-1640-3-4: Round-trip — feed result back as module input; verify idempotency
+#
+# Run: ansible-playbook playbooks/backward_compat/TC-1640-3-1-flat-keys.yml
+#
+- name: "TC-1640-3-1/2 | Backward Compat — 2.6 Flat Keys Present in 2.7 Output"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+
+  vars:
+    org_name: "TestOrg-BC-1640-{{ rh_username }}"
+    user_name: "testuser-bc-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      aap_hostname: "{{ aap_hostname }}"
+      aap_username: "{{ aap_username }}"
+      aap_password: "{{ aap_password }}"
+      aap_validate_certs: "{{ aap_validate_certs }}"
+
+  tasks:
+    - block:
+        # ---- TC-1640-3-2: Organization flat keys ----
+        - name: "[TC-1640-3-2] Create organization"
+          ansible.platform.organization:
+            name: "{{ org_name }}"
+            description: "BC test org"
+            state: present
+            <<: *aap_conn
+          register: org
+
+        - name: "Assert 2.7 nested key: org.organization.name"
+          ansible.builtin.assert:
+            that:
+              - org.organization is defined
+              - org.organization.name == org_name
+            fail_msg: "REGRESSION: org.organization.name missing (2.7 nested key)"
+
+        - name: "Assert 2.6 flat key: org.name (backward compat)"
+          ansible.builtin.assert:
+            that:
+              - org.name is defined
+              - org.name == org_name
+              - org.name == org.organization.name
+            fail_msg: >
+              REGRESSION: org.name flat key missing or doesn't match nested.
+              org.name={{ org.name | default('UNDEFINED') }},
+              org.organization.name={{ org.organization.name | default('UNDEFINED') }}
+
+        - name: "Assert org.id flat key"
+          ansible.builtin.assert:
+            that:
+              - org.id is defined
+              - org.id == org.organization.id
+            fail_msg: "REGRESSION: org.id flat key missing or doesn't match nested id"
+
+        # ---- TC-1640-3-1: User flat keys ----
+        - name: "[TC-1640-3-1] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "bc-{{ rh_username }}@testathon.local"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: usr
+
+        - name: "Assert 2.7 nested: usr.user.username"
+          ansible.builtin.assert:
+            that:
+              - usr.user is defined
+              - usr.user.username == user_name
+            fail_msg: "REGRESSION: usr.user.username missing"
+
+        - name: "Assert 2.6 flat: usr.username"
+          ansible.builtin.assert:
+            that:
+              - usr.username is defined
+              - usr.username == user_name
+              - usr.username == usr.user.username
+            fail_msg: >
+              REGRESSION: usr.username flat key missing or doesn't match nested.
+              usr.username={{ usr.username | default('UNDEFINED') }}
+
+        - name: "Assert usr.id flat key"
+          ansible.builtin.assert:
+            that:
+              - usr.id is defined
+              - usr.id == usr.user.id
+            fail_msg: "REGRESSION: usr.id flat key missing"
+
+        # ---- TC-1640-3-4: Round-trip idempotency ----
+        - name: "[TC-1640-3-4] Round-trip — feed result.user back as module input"
+          ansible.platform.user:
+            username: "{{ usr.user.username }}"
+            email: "{{ usr.user.email }}"
+            state: present
+            <<: *aap_conn
+          register: roundtrip
+
+        - name: "Assert round-trip is idempotent (no change)"
+          ansible.builtin.assert:
+            that:
+              - roundtrip is not changed
+            fail_msg: "Round-trip using result.user fields caused unexpected change"
+
+        - name: "[TC-1640-3-1/2/4] PASS"
+          ansible.builtin.debug:
+            msg: >
+              TC-1640-3-1 PASSED — usr.username flat key present and matches nested.
+              TC-1640-3-2 PASSED — org.name flat key present and matches nested.
+              TC-1640-3-4 PASSED — round-trip idempotency confirmed.
+
+      rescue:
+        - name: "[TC-1640-3-1/2/4] FAIL"
+          ansible.builtin.fail:
+            msg: "Section C backward compat test FAILED — see above assertions"
+
+      always:
+        - ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+        - ansible.platform.organization:
+            name: "{{ org_name }}"
+            state: absent
+            <<: *aap_conn
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...
