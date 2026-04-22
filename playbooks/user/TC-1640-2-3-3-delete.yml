@@ -1,5 +1,5 @@
 ---
-# TC-1640-2-3-6: Delete User
+# TC-1640-2-3-3: Delete User
 - name: "TC-1640-2-3-3 | User — Delete"
   hosts: localhost
   gather_facts: false
@@ -23,14 +23,14 @@
             state: present
             <<: *aap_conn
 
-        - name: "[TC-1640-2-3-6] Delete user"
+        - name: "[TC-1640-2-3-3] Delete user"
           ansible.platform.user:
             username: "{{ user_name }}"
             state: absent
             <<: *aap_conn
-          register: del
+          register: deleted
         - ansible.builtin.assert:
-            that: del is changed
+            that: deleted is changed
             fail_msg: "Delete not reported as changed"
 
         - name: "Idempotent absent"
@@ -44,7 +44,7 @@
             fail_msg: "Delete re-run not idempotent"
 
         - ansible.builtin.debug:
-            msg: "TC-1640-2-3-6 PASSED"
+            msg: "TC-1640-2-3-3 PASSED"
       rescue:
         - ansible.builtin.fail:
             msg: "TC-1640-2-3-3 FAILED"
