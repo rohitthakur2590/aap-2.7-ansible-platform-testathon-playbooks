@@ -6,9 +6,9 @@
     type: "ansible_base.authentication.authenticator_plugins.local"
     configuration: {}
     state: absent
-    aap_hostname: "{{ aap_hostname }}"
-    aap_username: "{{ aap_username }}"
-    aap_password: "{{ aap_password }}"
-    aap_validate_certs: "{{ aap_validate_certs }}"
+    gateway_hostname: "{{ gateway_hostname }}"
+    gateway_username: "{{ gateway_username }}"
+    gateway_password: "{{ gateway_password }}"
+    gateway_validate_certs: "{{ gateway_validate_certs }}"
   register: _r
   failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))

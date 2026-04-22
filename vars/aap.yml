@@ -1,8 +1,15 @@
 ---
-# AAP Gateway connection settings
-# Update these to match your test pod / local AAP instance
-aap_hostname: "https://<YOUR_POD_HOSTNAME>/"
-aap_username: "admin"
-aap_password: "REPLACE_ME"
-aap_validate_certs: false
-aap_request_timeout: 60
+# AAP connection settings.
+#
+# NOTE: These vars are still consumed by playbooks via vars_files for local-mode
+# module params (gateway_hostname, gateway_username, etc.).
+# The canonical place to set them is group_vars/all.yml — keep the values in sync.
+#
+# If you run playbooks via the AAP GUI (Job Templates), pass these as Extra Variables
+# on the template rather than editing this file.
+
+gateway_hostname: "https://<gateway>/"
+gateway_username: "*****"
+gateway_password: "*************"
+gateway_validate_certs: false
+gateway_request_timeout: 60

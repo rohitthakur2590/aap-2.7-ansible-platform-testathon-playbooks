@@ -30,10 +30,10 @@
         object_ids:
           - "{{ org_name }}"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -45,10 +45,10 @@
           - name: "{{ org_name }}"
             type: "organizations"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -59,10 +59,10 @@
           - "shared.view_organization"
         content_type: "shared.organization"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -71,10 +71,10 @@
         name: "{{ app_name }}"
         organization: "{{ org_name }}"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -85,10 +85,10 @@
         type: "ansible_base.authentication.authenticator_plugins.local"
         configuration: {}
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -96,10 +96,10 @@
       ansible.platform.user:
         username: "{{ user_name }}"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -108,10 +108,10 @@
         name: "{{ team_name }}"
         organization: "{{ org_name }}"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       register: _r
       failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
 
@@ -119,10 +119,10 @@
       ansible.platform.organization:
         name: "{{ item }}"
         state: absent
-        aap_hostname: "{{ aap_hostname }}"
-        aap_username: "{{ aap_username }}"
-        aap_password: "{{ aap_password }}"
-        aap_validate_certs: "{{ aap_validate_certs }}"
+        gateway_hostname: "{{ gateway_hostname }}"
+        gateway_username: "{{ gateway_username }}"
+        gateway_password: "{{ gateway_password }}"
+        gateway_validate_certs: "{{ gateway_validate_certs }}"
       loop:
         - "{{ org_name }}"
         - "{{ org_name_b }}"
