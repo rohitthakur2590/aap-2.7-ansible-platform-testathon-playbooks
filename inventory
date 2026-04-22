@@ -1,1 +1,32 @@
-localhost ansible_connection=local
+# aap-2.7-ansible-platform-testathon-playbooks inventory
+#
+# Three named hosts — one per connection mode.
+# Most playbooks (Section B, C) target [aap_local].
+# Section A connection-mode tests target [aap_http_direct] or [aap_http_persistent].
+#
+# All AAP connection details (hostname, credentials) are read from group_vars/all.yml
+# so you only need to fill them in once.
+
+# ── Local (default) ─────────────────────────────────────────────────────────
+# Action plugin runs on the controller; AAP API calls made as HTTP inside the plugin.
+# This is the standard mode for all CRUD and backward-compat tests.
+[aap_local]
+aap-local ansible_host=localhost
+
+# ── HTTP-direct ──────────────────────────────────────────────────────────────
+# ansible.platform.http connection plugin; each task opens a fresh HTTP session.
+# Tests that connection: ansible.platform.http behaves correctly per-task.
+[aap_http_direct]
+aap-direct ansible_host=localhost
+
+# ── HTTP-persistent ──────────────────────────────────────────────────────────
+# ansible.platform.http connection plugin with persistent=true;
+# one manager process reuses the session across all tasks in a play.
+[aap_http_persistent]
+aap-persistent ansible_host=localhost
+
+# ── Convenience super-group ──────────────────────────────────────────────────
+[aap_all:children]
+aap_local
+aap_http_direct
+aap_http_persistent

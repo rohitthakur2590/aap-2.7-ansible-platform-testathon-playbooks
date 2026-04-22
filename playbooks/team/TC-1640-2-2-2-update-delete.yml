@@ -10,10 +10,10 @@
     org_name: "TestOrg-1640-{{ rh_username }}"
     team_name: "TestTeam-1640-{{ rh_username }}"
     aap_conn: &aap_conn
-      aap_hostname: "{{ aap_hostname }}"
-      aap_username: "{{ aap_username }}"
-      aap_password: "{{ aap_password }}"
-      aap_validate_certs: "{{ aap_validate_certs }}"
+      gateway_hostname: "{{ gateway_hostname }}"
+      gateway_username: "{{ gateway_username }}"
+      gateway_password: "{{ gateway_password }}"
+      gateway_validate_certs: "{{ gateway_validate_certs }}"
   tasks:
     - block:
         - name: "[setup] Create org and team"

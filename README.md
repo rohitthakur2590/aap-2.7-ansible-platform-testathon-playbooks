@@ -13,15 +13,20 @@ All resources are namespaced with your `rh_username` so multiple testers can sha
 ```
 .
 ├── ansible.cfg                          # inventory + stdout_callback = yaml
-├── inventory                            # localhost only
+├── inventory                            # Three groups: aap_local, aap_http_direct, aap_http_persistent
+├── group_vars/
+│   ├── all.yml                          # Shared AAP credentials + rh_username (edit this)
+│   ├── aap_local.yml                    # ansible_connection: local
+│   ├── aap_http_direct.yml              # ansible.platform.http, persistent=false
+│   └── aap_http_persistent.yml         # ansible.platform.http, persistent=true
 ├── vars/
-│   ├── aap.yml                          # AAP connection settings (edit before running)
-│   ├── user.yml                         # Your rh_username (edit before running)
-│   └── connection.yml                   # Connection mode overrides (optional)
+│   ├── aap.yml                          # Module-param aliases (keeps vars_files working; keep in sync with group_vars/all.yml)
+│   ├── user.yml                         # rh_username alias
+│   └── connection.yml                   # Legacy connection mode var (unused by current playbooks)
 ├── reset/                               # Reusable teardown task files (included by playbooks)
 ├── clean_all.yml                        # Nuclear option: wipe all test resources for your username
 └── playbooks/
-    ├── connection/                      # Section A — Connection mode tests
+    ├── connection/                      # Section A — Connection mode tests (target specific inventory groups)
     ├── org/                             # Section B — Organization CRUD
     ├── team/                            # Section B — Team CRUD
     ├── user/                            # Section B — User CRUD
@@ -34,6 +39,16 @@ All resources are namespaced with your `rh_username` so multiple testers can sha
     ├── settings/                        # Section B — Settings update/restore
     └── backward_compat/                 # Section C — 2.6 backward compatibility
 ```
+
+### Inventory groups and connection modes
+
+The inventory defines three hosts — one per connection mode. Connection parameters flow in automatically via `group_vars/` rather than being set as play variables.
+
+| Inventory group | Host alias | `ansible_connection` | Persistent? | Used by |
+|---|---|---|---|---|
+| `aap_local` | `aap-local` | `local` | N/A | All Section B/C playbooks |
+| `aap_http_direct` | `aap-direct` | `ansible.platform.http` | false | TC-1640-1-2 |
+| `aap_http_persistent` | `aap-persistent` | `ansible.platform.http` | true | TC-1640-1-3 |
 
 ---
 
@@ -66,24 +81,22 @@ ansible-galaxy collection list ansible.platform
 
 ### 2. Configure vars
 
-Edit **`vars/aap.yml`** with your pod's hostname and credentials:
+Edit **`group_vars/all.yml`** — this is the single place for all credentials and your username:
 
 ```yaml
 aap_hostname: "https://my-aap-pod.example.com/"
 aap_username: "admin"
 aap_password: "your-password"
 aap_validate_certs: false
-```
 
-Edit **`vars/user.yml`** with your Red Hat username (used for resource namespacing):
-
-```yaml
 rh_username: "jsmith"
 ```
 
 > **Important:** each tester on a shared pod must set a unique `rh_username`.  
 > All resources created by the playbooks include this value in their names  
 > (e.g. `TestOrg-1640-jsmith`) so they cannot conflict.
+
+The `group_vars/aap_http_direct.yml` and `group_vars/aap_http_persistent.yml` files automatically derive `ansible_host`, `ansible_user`, `ansible_password`, and `ansible_httpapi_*` from the `aap_*` vars above — you do not need to edit those files.
 
 ---
 
@@ -105,16 +118,21 @@ ansible-playbook clean_all.yml
 
 ### Connection mode variants
 
-By default all playbooks use `connection: local`.  
-To test `http-direct` or `http-persistent` modes, use the dedicated Section A playbooks or pass extra vars:
+All Section B and C playbooks target `aap_local` (local connection, the default).  
+The Section A playbooks target their specific inventory group — connection vars are injected automatically from `group_vars/`:
 
 ```bash
-# http-direct (bypasses local httpapi, hits AAP REST directly)
+# local mode (default — all module params passed as task args)
+ansible-playbook playbooks/connection/TC-1640-1-1-local.yml
+
+# http-direct (ansible.platform.http, new session per task)
 ansible-playbook playbooks/connection/TC-1640-1-2-http-direct.yml
 
-# http-persistent (uses the persistent connection manager)
+# http-persistent (ansible.platform.http, session reused across tasks)
 ansible-playbook playbooks/connection/TC-1640-1-3-http-persistent.yml
 ```
+
+No extra vars or `ansible_connection` overrides needed — the inventory groups handle it.
 
 ---
 

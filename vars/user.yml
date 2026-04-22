@@ -1,5 +1,8 @@
 ---
-# Your Red Hat username — used to namespace test resources so they don't collide
-# across testers sharing the same AAP pod.
-# Example: rh_username: jsmith
-rh_username: "REPLACE_ME"
+# Your Red Hat username — used to namespace all test resources.
+#
+# NOTE: The canonical place to set this is group_vars/all.yml.
+# This file is still loaded by vars_files in individual playbooks as a fallback.
+# Keep both in sync.
+
+rh_username: "rothakur"
