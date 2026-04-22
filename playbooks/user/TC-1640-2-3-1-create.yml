@@ -39,17 +39,20 @@
               - result.username == user_name
             fail_msg: "REGRESSION: result.username flat key missing (2.6 backward compat)"
 
-        - name: "[TC-1640-2-3-1] Idempotency"
+        - name: "[TC-1640-2-3-1] Idempotency — re-run with update_secrets: false"
           ansible.platform.user:
             username: "{{ user_name }}"
             email: "{{ user_email }}"
             password: "TestPass123!"
             state: present
+            update_secrets: false   # prevents password from being re-sent; required for idempotent runs
             <<: *aap_conn
           register: idem
         - ansible.builtin.assert:
             that: idem is not changed
-            fail_msg: "User re-run not idempotent"
+            fail_msg: >
+              User re-run not idempotent even with update_secrets: false.
+              This means a non-password field is incorrectly triggering changed.
 
         - ansible.builtin.debug:
             msg: "TC-1640-2-3-1 PASSED"

@@ -97,6 +97,7 @@
               usr.username={{ usr.username | default('UNDEFINED') }},
               usr.email={{ usr.email | default('UNDEFINED') }}
 
+
         # ---- Team output diff ----
         - name: "[TC-1640-3-3] Create team"
           ansible.platform.team:
