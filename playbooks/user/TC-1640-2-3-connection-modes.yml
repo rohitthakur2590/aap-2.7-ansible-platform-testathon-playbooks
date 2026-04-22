@@ -1,0 +1,222 @@
+---
+# TC-1640-2-3-CM: User module — connection mode compatibility
+#
+# Runs the same create/idempotency/delete cycle against all three connection modes:
+#   - aap_local         (action plugin, ephemeral HTTP manager)
+#   - aap_http_direct   (ansible.platform.http, new session per task)
+#   - aap_http_persistent (ansible.platform.http, shared session across tasks)
+#
+# Each play is fully self-contained — it creates, tests, and deletes the user
+# so the next play always starts from a clean state.
+#
+# Run all modes:
+#   ansible-playbook playbooks/user/TC-1640-2-3-connection-modes.yml
+#
+# Run a single mode:
+#   ansible-playbook playbooks/user/TC-1640-2-3-connection-modes.yml --limit aap_http_direct
+
+# ─── Local mode ───────────────────────────────────────────────────────────────
+- name: "TC-1640-2-3-CM | User — aap_local (action plugin / ephemeral)"
+  hosts: aap_local
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    user_name: "testuser-cm-{{ rh_username }}"
+    user_email: "testuser-cm-{{ rh_username }}@testathon.local"
+    aap_conn: &aap_conn
+      gateway_hostname: "{{ gateway_hostname }}"
+      gateway_username: "{{ gateway_username }}"
+      gateway_password: "{{ gateway_password }}"
+      gateway_validate_certs: "{{ gateway_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[CM-local] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+            <<: *aap_conn
+          register: result
+
+        - name: "[CM-local] Assert created"
+          ansible.builtin.assert:
+            that:
+              - result is changed
+              - result.user.username == user_name
+            fail_msg: "aap_local: user create failed or not changed"
+
+        - name: "[CM-local] Idempotency"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+            update_secrets: false
+            <<: *aap_conn
+          register: idem
+
+        - name: "[CM-local] Assert idempotent"
+          ansible.builtin.assert:
+            that: idem is not changed
+            fail_msg: "aap_local: user re-run not idempotent"
+
+        - name: "[CM-local] Delete user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          register: deleted
+
+        - name: "[CM-local] Assert deleted"
+          ansible.builtin.assert:
+            that: deleted is changed
+            fail_msg: "aap_local: user delete not changed"
+
+        - ansible.builtin.debug:
+            msg: "✅ aap_local PASSED"
+
+      rescue:
+        - ansible.builtin.fail:
+            msg: "❌ aap_local FAILED"
+      always:
+        - name: "[CM-local] Cleanup"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+            <<: *aap_conn
+          ignore_errors: true
+
+
+# ─── HTTP direct mode ─────────────────────────────────────────────────────────
+- name: "TC-1640-2-3-CM | User — aap_http_direct (http plugin, new session per task)"
+  hosts: aap_http_direct
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    user_name: "testuser-cm-{{ rh_username }}"
+    user_email: "testuser-cm-{{ rh_username }}@testathon.local"
+  tasks:
+    - block:
+        - name: "[CM-http-direct] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+          register: result
+
+        - name: "[CM-http-direct] Assert created"
+          ansible.builtin.assert:
+            that:
+              - result is changed
+              - result.user.username == user_name
+            fail_msg: "aap_http_direct: user create failed or not changed"
+
+        - name: "[CM-http-direct] Idempotency"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+            update_secrets: false
+          register: idem
+
+        - name: "[CM-http-direct] Assert idempotent"
+          ansible.builtin.assert:
+            that: idem is not changed
+            fail_msg: "aap_http_direct: user re-run not idempotent"
+
+        - name: "[CM-http-direct] Delete user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+          register: deleted
+
+        - name: "[CM-http-direct] Assert deleted"
+          ansible.builtin.assert:
+            that: deleted is changed
+            fail_msg: "aap_http_direct: user delete not changed"
+
+        - ansible.builtin.debug:
+            msg: "✅ aap_http_direct PASSED"
+
+      rescue:
+        - ansible.builtin.fail:
+            msg: "❌ aap_http_direct FAILED"
+      always:
+        - name: "[CM-http-direct] Cleanup"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+          ignore_errors: true
+
+
+# ─── HTTP persistent mode ─────────────────────────────────────────────────────
+- name: "TC-1640-2-3-CM | User — aap_http_persistent (http plugin, shared session)"
+  hosts: aap_http_persistent
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    user_name: "testuser-cm-{{ rh_username }}"
+    user_email: "testuser-cm-{{ rh_username }}@testathon.local"
+  tasks:
+    - block:
+        - name: "[CM-http-persistent] Create user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+          register: result
+
+        - name: "[CM-http-persistent] Assert created"
+          ansible.builtin.assert:
+            that:
+              - result is changed
+              - result.user.username == user_name
+            fail_msg: "aap_http_persistent: user create failed or not changed"
+
+        - name: "[CM-http-persistent] Idempotency"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            email: "{{ user_email }}"
+            password: "TestPass123!"
+            state: present
+            update_secrets: false
+          register: idem
+
+        - name: "[CM-http-persistent] Assert idempotent"
+          ansible.builtin.assert:
+            that: idem is not changed
+            fail_msg: "aap_http_persistent: user re-run not idempotent"
+
+        - name: "[CM-http-persistent] Delete user"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+          register: deleted
+
+        - name: "[CM-http-persistent] Assert deleted"
+          ansible.builtin.assert:
+            that: deleted is changed
+            fail_msg: "aap_http_persistent: user delete not changed"
+
+        - ansible.builtin.debug:
+            msg: "✅ aap_http_persistent PASSED"
+
+      rescue:
+        - ansible.builtin.fail:
+            msg: "❌ aap_http_persistent FAILED"
+      always:
+        - name: "[CM-http-persistent] Cleanup"
+          ansible.platform.user:
+            username: "{{ user_name }}"
+            state: absent
+          ignore_errors: true
