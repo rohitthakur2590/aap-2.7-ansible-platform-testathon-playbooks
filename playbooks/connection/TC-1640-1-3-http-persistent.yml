@@ -38,6 +38,7 @@
             email: "{{ test_email }}"
             password: "TestPass123!"
             state: present
+            update_secrets: false
             <<: *aap_conn
           register: t2
 
