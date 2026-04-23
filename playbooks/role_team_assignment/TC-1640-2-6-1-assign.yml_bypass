@@ -1,0 +1,122 @@
+---
+# TC-1640-2-6-1: Assign team role + state: exists check + multi-object + delete
+- name: "TC-1640-2-6-1 | Role Team Assignment — Lifecycle"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../vars/aap.yml
+    - ../../vars/user.yml
+  vars:
+    org_name: "TestOrg-1640-{{ rh_username }}"
+    org_name_b: "TestOrg-1640-B-{{ rh_username }}"
+    team_name: "TestTeam-1640-{{ rh_username }}"
+    role_name: "TestRole-1640-{{ rh_username }}"
+    aap_conn: &aap_conn
+      gateway_hostname: "{{ gateway_hostname }}"
+      gateway_username: "{{ gateway_username }}"
+      gateway_password: "{{ gateway_password }}"
+      gateway_validate_certs: "{{ gateway_validate_certs }}"
+  tasks:
+    - block:
+        - name: "[setup] Create orgs, team, role"
+          ansible.platform.organization:
+            name: "{{ item }}"
+            state: present
+            <<: *aap_conn
+          loop:
+            - "{{ org_name }}"
+            - "{{ org_name_b }}"
+
+        - ansible.platform.team:
+            name: "{{ team_name }}"
+            organization: "{{ org_name }}"
+            state: present
+            <<: *aap_conn
+
+        - ansible.platform.role_definition:
+            name: "{{ role_name }}"
+            content_type: "shared.organization"
+            permissions:
+              - "shared.view_organization"
+            state: present
+            <<: *aap_conn
+
+        - name: "[TC-1640-2-6-1] Assign team to org"
+          ansible.platform.role_team_assignment:
+            role_definition: "{{ role_name }}"
+            team: "{{ team_name }}"
+            assignment_objects:
+              - name: "{{ org_name }}"
+                type: "organizations"
+            state: present
+            <<: *aap_conn
+          register: result
+        - ansible.builtin.assert:
+            that: result is changed
+            fail_msg: "Role team assignment not reported as changed"
+
+        - name: "[TC-1640-2-6-2] Multi-object assignment"
+          ansible.platform.role_team_assignment:
+            role_definition: "{{ role_name }}"
+            team: "{{ team_name }}"
+            assignment_objects:
+              - name: "{{ org_name_b }}"
+                type: "organizations"
+            state: present
+            <<: *aap_conn
+          register: multi
+        - ansible.builtin.assert:
+            that: multi is changed
+            fail_msg: "Multi-object assignment not reported as changed"
+
+        - name: "[TC-1640-2-6-3] state: exists check"
+          ansible.platform.role_team_assignment:
+            role_definition: "{{ role_name }}"
+            team: "{{ team_name }}"
+            assignment_objects:
+              - name: "{{ org_name }}"
+                type: "organizations"
+            state: exists
+            <<: *aap_conn
+          register: exists_check
+        - ansible.builtin.assert:
+            that:
+              - exists_check is not changed
+              - exists_check.id is defined
+              - exists_check.id is not none
+            fail_msg: "state: exists check failed or reported changed"
+          # NOTE: role_team_assignment does not return an 'exists' key for state: exists
+          # (unlike base_action modules). Check exists_check.id instead.
+
+        - name: "[TC-1640-2-6-4] Remove assignment"
+          ansible.platform.role_team_assignment:
+            role_definition: "{{ role_name }}"
+            team: "{{ team_name }}"
+            assignment_objects:
+              - name: "{{ org_name }}"
+                type: "organizations"
+            state: absent
+            <<: *aap_conn
+          register: deleted
+        - ansible.builtin.assert:
+            that: deleted is changed
+            fail_msg: "Assignment delete not reported as changed"
+
+        - ansible.builtin.debug:
+            msg: "TC-1640-2-6-1 through TC-1640-2-6-4 PASSED"
+      rescue:
+        - ansible.builtin.fail:
+            msg: "TC-1640-2-6-1 FAILED"
+      always:
+        - ansible.builtin.include_tasks: ../../reset/role_definition.yml
+        - ansible.builtin.include_tasks: ../../reset/team.yml
+        - ansible.platform.organization:
+            name: "{{ item }}"
+            state: absent
+            <<: *aap_conn
+          loop:
+            - "{{ org_name }}"
+            - "{{ org_name_b }}"
+          register: _r
+          failed_when: _r.failed and 'Not Found' not in (_r.msg | default(''))
+...
