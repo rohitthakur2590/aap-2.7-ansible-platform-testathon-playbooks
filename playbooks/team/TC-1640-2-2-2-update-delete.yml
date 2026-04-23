@@ -45,9 +45,9 @@
             organization: "{{ org_name }}"
             state: absent
             <<: *aap_conn
-          register: del
+          register: deleted
         - ansible.builtin.assert:
-            that: del is changed
+            that: deleted is changed
             fail_msg: "Team delete did not report changed"
 
         - name: "[TC-1640-2-2-4] Delete idempotency"

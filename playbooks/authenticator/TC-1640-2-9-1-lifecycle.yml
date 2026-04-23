@@ -57,9 +57,9 @@
             configuration: {}
             state: absent
             <<: *aap_conn
-          register: del
+          register: deleted
         - ansible.builtin.assert:
-            that: del is changed
+            that: deleted is changed
             fail_msg: "Authenticator delete not reported as changed"
 
         - ansible.builtin.debug:

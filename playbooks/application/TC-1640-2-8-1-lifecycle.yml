@@ -28,8 +28,7 @@
             organization: "{{ org_name }}"
             authorization_grant_type: "authorization-code"
             client_type: "confidential"
-            redirect_uris:
-              - "https://testathon.local/callback"
+            redirect_uris: "https://testathon.local/callback"
             state: present
             <<: *aap_conn
           register: result
@@ -48,8 +47,7 @@
             organization: "{{ org_name }}"
             authorization_grant_type: "authorization-code"
             client_type: "confidential"
-            redirect_uris:
-              - "https://testathon.local/callback"
+            redirect_uris: "https://testathon.local/callback"
             state: present
             <<: *aap_conn
           register: idem

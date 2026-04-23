@@ -46,9 +46,9 @@
               - "shared.view_organization"
             state: absent
             <<: *aap_conn
-          register: del
+          register: deleted
         - ansible.builtin.assert:
-            that: del is changed
+            that: deleted is changed
             fail_msg: "Delete not reported as changed"
 
         - ansible.builtin.debug:
